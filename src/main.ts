@@ -15,6 +15,13 @@ async function bootstrap() {
     app.set('trust proxy', /^\d+$/.test(valor) ? Number(valor) : valor);
   }
 
+  // Origens do front liberadas (separadas por vírgula). Padrão: Vite local.
+  app.enableCors({
+    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+      .split(',')
+      .map((o) => o.trim()),
+  });
+
   // Fecha o pool do banco e conexões abertas ao receber SIGTERM/SIGINT.
   app.enableShutdownHooks();
 
