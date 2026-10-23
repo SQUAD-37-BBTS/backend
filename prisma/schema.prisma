@@ -1,0 +1,190 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = "js"
+  moduleFormat        = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ativo {
+  id                         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                       String                      @db.VarChar(200)
+  tipo_componente            String                      @db.VarChar(100)
+  descricao                  String?
+  objetivo                   String?
+  dominio_id                 String                      @db.Uuid
+  situacao                   String                      @default("Rascunho") @db.VarChar(30)
+  criticidade                String?                     @db.VarChar(30)
+  usa_cloud                  Boolean                     @default(false)
+  data_criacao               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  dominio                    dominio                     @relation(fields: [dominio_id], references: [id], map: "fk_ativo_dominio")
+  contextualizacao_avaliacao contextualizacao_avaliacao?
+  decisao                    decisao[]
+  motor_enquadramento        motor_enquadramento?
+  papel_ativo                papel_ativo[]
+
+  @@index([dominio_id], map: "ix_ativo_dominio_id")
+  @@index([situacao], map: "ix_ativo_situacao")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model catalogo_modelo_fundacional {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fornecedor      String    @db.VarChar(100)
+  modelo          String    @db.VarChar(150)
+  versao_variante String?   @db.VarChar(100)
+  situacao        String    @default("Em_Avaliacao") @db.VarChar(30)
+  restricoes_uso  String?
+  responsavel_id  String    @db.Uuid
+  inicio_vigencia DateTime? @db.Date
+  proxima_revisao DateTime? @db.Date
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  pessoa          pessoa    @relation(fields: [responsavel_id], references: [id], map: "fk_catalogo_modelo_responsavel")
+
+  @@unique([fornecedor, modelo, versao_variante], map: "uq_catalogo_modelo")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model catalogo_tecnologia {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome_tec   String   @db.VarChar(150)
+  fornecedor String?  @db.VarChar(150)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([nome_tec, fornecedor], map: "uq_catalogo_tecnologia")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model contextualizacao_avaliacao {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativo_id   String   @unique(map: "uq_contextualizacao_ativo") @db.Uuid
+  respostas  Json     @default("{}")
+  data       DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  ativo      ativo    @relation(fields: [ativo_id], references: [id], onDelete: Cascade, map: "fk_contextualizacao_ativo")
+
+  @@index([respostas], map: "ix_contextualizacao_respostas_gin", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model decisao {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativo_id          String   @db.Uuid
+  tipo_decisao      String   @db.VarChar(50)
+  responsavel_id    String   @db.Uuid
+  justificativa     String
+  resultado_decisao String   @db.VarChar(30)
+  data              DateTime @default(now()) @db.Timestamptz(6)
+  ativo             ativo    @relation(fields: [ativo_id], references: [id], map: "fk_decisao_ativo")
+  pessoa            pessoa   @relation(fields: [responsavel_id], references: [id], map: "fk_decisao_responsavel")
+
+  @@index([ativo_id], map: "ix_decisao_ativo_id")
+  @@index([responsavel_id], map: "ix_decisao_responsavel_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model dominio {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome       String   @unique(map: "uq_dominio_nome") @db.VarChar(150)
+  owner_id   String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  ativo      ativo[]
+  pessoa     pessoa   @relation(fields: [owner_id], references: [id], map: "fk_dominio_owner")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model log_auditoria {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id     String   @db.Uuid
+  tabela_afetada String   @db.VarChar(100)
+  valor_antigo   Json?
+  valor_novo     Json?
+  data_alteracao DateTime @default(now()) @db.Timestamptz(6)
+  motivo         String?
+  pessoa         pessoa   @relation(fields: [usuario_id], references: [id], map: "fk_log_auditoria_usuario")
+
+  @@index([data_alteracao], map: "ix_log_auditoria_data")
+  @@index([tabela_afetada], map: "ix_log_auditoria_tabela_afetada")
+  @@index([usuario_id], map: "ix_log_auditoria_usuario_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model motor_enquadramento {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativo_id                 String   @unique(map: "uq_motor_enquadramento_ativo") @db.Uuid
+  trilha_governanca        String   @db.VarChar(100)
+  explicacao_enquadramento String?
+  data_calculo             DateTime @default(now()) @db.Timestamptz(6)
+  created_at               DateTime @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime @default(now()) @db.Timestamptz(6)
+  ativo                    ativo    @relation(fields: [ativo_id], references: [id], onDelete: Cascade, map: "fk_motor_enquadramento_ativo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model papel_ativo {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativo_id   String   @db.Uuid
+  pessoa_id  String   @db.Uuid
+  tipo_papel String   @db.VarChar(30)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  ativo      ativo    @relation(fields: [ativo_id], references: [id], onDelete: Cascade, map: "fk_papel_ativo_ativo")
+  pessoa     pessoa   @relation(fields: [pessoa_id], references: [id], map: "fk_papel_ativo_pessoa")
+
+  @@unique([ativo_id, pessoa_id, tipo_papel], map: "uq_papel_ativo_pessoa_tipo")
+  @@index([ativo_id], map: "ix_papel_ativo_ativo_id")
+  @@index([pessoa_id], map: "ix_papel_ativo_pessoa_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model pessoa {
+  id                          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                        String                        @db.VarChar(150)
+  email                       String                        @unique(map: "uq_pessoa_email") @db.VarChar(255)
+  area                        String?                       @db.VarChar(150)
+  senha_hash                  String
+  papel_sistema               String                        @default("Usuario") @db.VarChar(20)
+  ativo                       Boolean                       @default(true)
+  ultimo_login                DateTime?                     @db.Timestamptz(6)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  catalogo_modelo_fundacional catalogo_modelo_fundacional[]
+  decisao                     decisao[]
+  dominio                     dominio[]
+  log_auditoria               log_auditoria[]
+  papel_ativo                 papel_ativo[]
+  refresh_token               refresh_token[]
+
+  @@index([email], map: "ix_pessoa_email")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model refresh_token {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pessoa_id   String    @db.Uuid
+  token_hash  String    @unique(map: "uq_refresh_token_hash")
+  criado_em   DateTime  @default(now()) @db.Timestamptz(6)
+  expira_em   DateTime  @db.Timestamptz(6)
+  revogado_em DateTime? @db.Timestamptz(6)
+  user_agent  String?   @db.VarChar(255)
+  ip_origem   String?   @db.Inet
+  pessoa      pessoa    @relation(fields: [pessoa_id], references: [id], onDelete: Cascade, map: "fk_refresh_token_pessoa")
+
+  @@index([expira_em], map: "ix_refresh_token_expira_em")
+  @@index([pessoa_id], map: "ix_refresh_token_pessoa_id")
+}
