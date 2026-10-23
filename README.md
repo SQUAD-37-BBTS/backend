@@ -1,114 +1,198 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Orion — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST em [NestJS](https://nestjs.com) + Prisma (PostgreSQL/Supabase) para inventário e governança de ativos de IA: domínios, pessoas, ativos (papéis, contextualização, enquadramento e decisões), catálogo de modelos/tecnologias e trilha de auditoria.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Como rodar
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env     # preencha DATABASE_URL, DIRECT_URL e JWT_SECRET
+
+npm run start:dev        # desenvolvimento (watch)
+npm run build && npm run start:prod
 ```
 
-## Compile and run the project
+Criar o primeiro Admin:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run build
+ADMIN_NOME="..." ADMIN_EMAIL="..." ADMIN_SENHA="..." npm run admin:criar
 ```
 
-## Run tests
+Testes e lint: `npm run test`, `npm run test:e2e`, `npm run lint`.
 
-```bash
-# unit tests
-$ npm run test
+### Variáveis de ambiente
 
-# e2e tests
-$ npm run test:e2e
+| Variável | Descrição | Padrão |
+| --- | --- | --- |
+| `DATABASE_URL` | Conexão (pooler, porta 6543) usada em runtime | — |
+| `DIRECT_URL` | Conexão direta (porta 5432) usada pelo Prisma CLI | — |
+| `JWT_SECRET` | Segredo de assinatura do access token | — |
+| `JWT_ACCESS_TTL_SEGUNDOS` | Validade do access token | `900` |
+| `JWT_REFRESH_TTL_DIAS` | Validade do refresh token | `7` |
+| `PORT` | Porta HTTP | `3000` |
+| `TRUST_PROXY` | Nº de proxies confiáveis (para `req.ip` correto) | — |
+| `HTTP_TIMEOUT_MS` | Timeout por requisição | `10000` |
+| `DB_POOL_MAX`, `DB_CONNECTION_TIMEOUT_MS`, `DB_QUERY_TIMEOUT_MS` | Pool e timeouts do banco | `10`, `5000`, `8000` |
+| `RATE_LIMIT_MAX` | Requisições/min por usuário (ou IP) | `120` |
+| `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_BLOQUEIO_MIN` | Tentativas de login/min e minutos de bloqueio ao estourar | `5`, `5` |
+| `RATE_LIMIT_REFRESH_MAX` | Refresh/min | `20` |
 
-# test coverage
-$ npm run test:cov
-```
+## Convenções da API
 
-## Deployment
+- **Autenticação:** todas as rotas exigem `Authorization: Bearer <access_token>`, exceto as marcadas como **Pública**.
+- **Autorização:** rotas marcadas **Admin** exigem `papel_sistema = Admin`; as demais aceitam qualquer usuário autenticado.
+- **Validação:** o corpo é validado com whitelist — campos desconhecidos retornam `400`. IDs em rotas (`:id`) devem ser UUID.
+- **Paginação** (`GET` de listas): query `pagina` (≥ 1, padrão 1) e `limite` (1–100, padrão 20). Resposta: `{ dados, total, pagina, limite }`.
+- **Rate limit:** padrão por usuário autenticado (ou por IP); `429` ao estourar.
+- **Erros:** `{ statusCode, message }`. Erros do banco são traduzidos: `404` (não encontrado), `409` (já existe / violação de relacionamento), `503` (banco indisponível, com `Retry-After`), `504` (timeout).
+- **Auditoria:** criações, alterações e remoções registram o usuário responsável (consulte em `GET /auditoria`).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Roteiro dos endpoints
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+Legenda de acesso: 🌐 Pública · 🔒 Autenticado · 👑 Admin
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Saúde
 
-## Observability
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/` | 🌐 | Resposta simples (`Hello World!`). |
+| GET | `/health/live` | 🌐 | Liveness: processo está de pé (`{ status: "ok" }`). Não consulta o banco. |
+| GET | `/health/ready` | 🌐 | Readiness: testa o banco (timeout 2 s). `200 { status, database: "up" }` ou `503 { database: "down" }`. Fora do rate limit. |
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+### Autenticação — `/auth`
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+| Método | Rota | Acesso | Corpo | Resposta |
+| --- | --- | --- | --- | --- |
+| POST | `/auth/login` | 🌐 | `{ email, senha }` | `200 { access_token, refresh_token, token_type: "Bearer" }` |
+| POST | `/auth/refresh` | 🌐 | `{ refresh_token }` | `200` novo par de tokens (rotação) |
+| POST | `/auth/logout` | 🌐 | `{ refresh_token }` | `204` revoga o refresh token |
+| GET | `/auth/me` | 🔒 | — | Dados da pessoa autenticada |
+| PATCH | `/auth/senha` | 🔒 | `{ senha_atual, nova_senha }` (mín. 8) | `204`; revoga todas as sessões |
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+Fluxo recomendado:
 
-## Resources
+1. `POST /auth/login` → guarde `access_token` e `refresh_token`.
+2. Envie `Authorization: Bearer <access_token>` nas demais chamadas.
+3. Ao receber `401`, chame `POST /auth/refresh` com o `refresh_token` e **substitua ambos os tokens** (cada refresh é de uso único).
+4. Reusar um refresh token já usado/revogado derruba todas as sessões da pessoa.
+5. `POST /auth/logout` ao sair.
 
-Check out a few resources that may come in handy when working with NestJS:
+Observações: login limitado a `RATE_LIMIT_LOGIN_MAX` tentativas/min, com bloqueio temporário ao estourar; credenciais inválidas e usuário inativo retornam `401 Credenciais inválidas`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Pessoas — `/pessoas`
 
-## Support
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/pessoas` | 🔒 | Lista paginada. Filtros: `busca`, `ativo` (`true`/`false`). |
+| GET | `/pessoas/:id` | 🔒 | Busca por ID. |
+| POST | `/pessoas` | 👑 | Cria. Corpo: `nome`, `email`, `senha` (mín. 8), `area?`, `papel_sistema?` (`Admin` \| `Usuario`). |
+| PATCH | `/pessoas/:id` | 👑 | Atualiza `nome`, `email`, `area`, `papel_sistema`, `ativo` (senha não é alterada aqui). |
+| DELETE | `/pessoas/:id` | 👑 | Desativa a pessoa (`204`). |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Domínios — `/dominios`
 
-## Stay in touch
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/dominios` | 🔒 | Lista paginada. Filtro: `busca`. |
+| GET | `/dominios/:id` | 🔒 | Busca por ID. |
+| POST | `/dominios` | 👑 | Cria. Corpo: `nome`, `owner_id` (UUID de pessoa). |
+| PATCH | `/dominios/:id` | 👑 | Atualiza `nome` e/ou `owner_id`. |
+| DELETE | `/dominios/:id` | 👑 | Remove (`204`). `409` se houver ativos vinculados. |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Ativos — `/ativos`
 
-## License
+**Ativo**
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/ativos` | 🔒 | Lista paginada. Filtros: `busca`, `dominio_id`, `situacao`, `criticidade`, `usa_cloud`, `pessoa_id` (ativos em que a pessoa tem algum papel). |
+| GET | `/ativos/:id` | 🔒 | Busca por ID. |
+| POST | `/ativos` | 🔒 | Cria. Corpo: `nome`, `tipo_componente`, `dominio_id`, `descricao?`, `objetivo?`, `situacao?`, `criticidade?`, `usa_cloud?`. |
+| PATCH | `/ativos/:id` | 🔒 | Atualiza qualquer campo da criação. |
+| DELETE | `/ativos/:id` | 👑 | Remove (`204`). |
+
+**Papéis** (quem faz o quê no ativo)
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/ativos/:id/papeis` | 🔒 | Lista papéis (com dados resumidos da pessoa). |
+| POST | `/ativos/:id/papeis` | 🔒 | Adiciona. Corpo: `pessoa_id`, `tipo_papel`. |
+| DELETE | `/ativos/:id/papeis/:papelId` | 🔒 | Remove (`204`). |
+
+**Contextualização** (questionário de avaliação)
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/ativos/:id/contextualizacao` | 🔒 | Busca as respostas (`404` se ainda não preenchida). |
+| PUT | `/ativos/:id/contextualizacao` | 🔒 | Cria/substitui. Corpo: `{ respostas: { ... } }`. |
+
+**Enquadramento** (trilha de governança)
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/ativos/:id/enquadramento` | 🔒 | Busca o enquadramento (`404` se inexistente). |
+| PUT | `/ativos/:id/enquadramento` | 👑 | Cria/substitui manualmente. Corpo: `trilha_governanca`, `explicacao_enquadramento?`. |
+
+**Decisões** (histórico imutável — só inclusão)
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/ativos/:id/decisoes` | 🔒 | Lista, da mais recente para a mais antiga. |
+| POST | `/ativos/:id/decisoes` | 🔒 | Registra. Corpo: `tipo_decisao`, `justificativa`, `resultado_decisao`. O responsável é o usuário autenticado. |
+
+Valores aceitos:
+
+| Campo | Valores |
+| --- | --- |
+| `situacao` (ativo) | `Rascunho`, `Inventariado`, `Descontinuado` |
+| `criticidade` | `Baixa`, `Media`, `Alta`, `Critica` |
+| `tipo_papel` | `Owner`, `Steward`, `Responsavel_Tecnico`, `Consumidor` |
+| `resultado_decisao` | `Aprovado`, `Rejeitado`, `Risco_Aceito`, `Adequacao_Solicitada` |
+
+### Catálogo — `/catalogo`
+
+Leitura para qualquer usuário autenticado; escrita somente Admin.
+
+**Modelos**
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/catalogo/modelos` | 🔒 | Lista paginada. Filtros: `busca`, `situacao`. |
+| GET | `/catalogo/modelos/:id` | 🔒 | Busca por ID. |
+| POST | `/catalogo/modelos` | 👑 | Cria. Corpo: `fornecedor`, `modelo`, `responsavel_id`, `versao_variante?`, `situacao?`, `restricoes_uso?`, `inicio_vigencia?`, `proxima_revisao?` (datas ISO `YYYY-MM-DD`). |
+| PATCH | `/catalogo/modelos/:id` | 👑 | Atualiza qualquer campo da criação. |
+| DELETE | `/catalogo/modelos/:id` | 👑 | Remove (`204`). |
+
+`situacao` (modelo): `Homologado`, `Em_Avaliacao`, `Restrito`, `Descontinuado`.
+
+**Tecnologias**
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/catalogo/tecnologias` | 🔒 | Lista paginada. Filtro: `busca`. |
+| GET | `/catalogo/tecnologias/:id` | 🔒 | Busca por ID. |
+| POST | `/catalogo/tecnologias` | 👑 | Cria. Corpo: `nome_tec`, `fornecedor?`. |
+| PATCH | `/catalogo/tecnologias/:id` | 👑 | Atualiza `nome_tec` e/ou `fornecedor`. |
+| DELETE | `/catalogo/tecnologias/:id` | 👑 | Remove (`204`). |
+
+### Auditoria — `/auditoria`
+
+| Método | Rota | Acesso | Descrição |
+| --- | --- | --- | --- |
+| GET | `/auditoria` | 👑 | Lista paginada de registros de auditoria. Filtros: `tabela`, `usuario_id`. |
+
+---
+
+## Roteiro de uso (primeiros passos)
+
+1. **Admin inicial:** `npm run admin:criar` (ver acima).
+2. **Login** em `POST /auth/login`.
+3. **Pessoas:** `POST /pessoas` para cadastrar quem será owner/responsável.
+4. **Domínio:** `POST /dominios` com `owner_id`.
+5. **Catálogo (opcional):** `POST /catalogo/modelos` e `/catalogo/tecnologias`.
+6. **Ativo:** `POST /ativos` com `dominio_id`.
+7. **Detalhar o ativo:** `POST /ativos/:id/papeis` → `PUT /ativos/:id/contextualizacao` → `PUT /ativos/:id/enquadramento` (Admin) → `POST /ativos/:id/decisoes`.
+8. **Acompanhar:** `GET /ativos` com filtros e `GET /auditoria` (Admin).
