@@ -12,6 +12,7 @@ import { CatalogoModule } from './catalogo/catalogo.module.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
 import { opcoesRateLimit } from './common/rate-limit.js';
 import { TimeoutInterceptor } from './common/timeout.interceptor.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DominiosModule } from './dominios/dominios.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PessoasModule } from './pessoas/pessoas.module.js';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     DominiosModule,
     AtivosModule,
     CatalogoModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
