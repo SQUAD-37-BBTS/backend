@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
@@ -38,10 +39,6 @@ export class CriarAtivoDto {
   dominio_id: string;
 
   @IsOptional()
-  @IsIn(SITUACAO_ATIVO)
-  situacao?: string;
-
-  @IsOptional()
   @IsIn(CRITICIDADE)
   criticidade?: string;
 
@@ -50,7 +47,13 @@ export class CriarAtivoDto {
   usa_cloud?: boolean;
 }
 
-export class AtualizarAtivoDto extends PartialType(CriarAtivoDto) {}
+// A situação nunca é informada no cadastro (nasce "Rascunho"). "Inventariado"
+// só vem do registro de decisão; na edição só é permitido descontinuar.
+export class AtualizarAtivoDto extends PartialType(CriarAtivoDto) {
+  @IsOptional()
+  @IsIn(['Descontinuado'])
+  situacao?: string;
+}
 
 export class AtivosQueryDto extends PaginacaoQueryDto {
   @IsOptional()
@@ -80,6 +83,19 @@ export class AtivosQueryDto extends PaginacaoQueryDto {
   @IsOptional()
   @IsUUID()
   pessoa_id?: string;
+
+  /** Com pessoa_id, restringe ao papel exercido ("meus ativos como Steward"). */
+  @IsOptional()
+  @IsIn(TIPO_PAPEL)
+  tipo_papel?: string;
+
+  /** true lista só ativos sem Owner (pendência); false, só os com Owner. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  sem_owner?: boolean;
 }
 
 export class CriarPapelDto {
@@ -110,7 +126,9 @@ export class CriarDecisaoDto {
   @MaxLength(50)
   tipo_decisao: string;
 
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty()
   justificativa: string;
 
   @IsIn(RESULTADO_DECISAO)

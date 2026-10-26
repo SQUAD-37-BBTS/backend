@@ -60,7 +60,7 @@ export class AtivosController {
     @Body() dto: AtualizarAtivoDto,
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
-    return this.ativos.atualizar(id, dto, u.id);
+    return this.ativos.atualizar(id, dto, u);
   }
 
   @Roles('Admin')
@@ -83,7 +83,7 @@ export class AtivosController {
     @Body() dto: CriarPapelDto,
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
-    return this.detalhes.adicionarPapel(id, dto, u.id);
+    return this.detalhes.adicionarPapel(id, dto, u);
   }
 
   @Delete(':id/papeis/:papelId')
@@ -93,7 +93,7 @@ export class AtivosController {
     @Param('papelId', ParseUUIDPipe) papelId: string,
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
-    await this.detalhes.removerPapel(id, papelId, u.id);
+    await this.detalhes.removerPapel(id, papelId, u);
   }
 
   // ---------- Contextualização
@@ -109,7 +109,7 @@ export class AtivosController {
     @Body() dto: SalvarContextualizacaoDto,
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
-    return this.detalhes.salvarContextualizacao(id, dto, u.id);
+    return this.detalhes.salvarContextualizacao(id, dto, u);
   }
 
   // ---------- Enquadramento
@@ -142,6 +142,6 @@ export class AtivosController {
     @Body() dto: CriarDecisaoDto,
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
-    return this.detalhes.registrarDecisao(id, dto, u.id);
+    return this.detalhes.registrarDecisao(id, dto, u);
   }
 }

@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { AuditoriaService } from '../auditoria/auditoria.service.js';
+import type { UsuarioAutenticado } from '../auth/decorators.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { exigirPapelNoAtivo } from './ativo-permissoes.js';
 import type {
   CriarDecisaoDto,
   CriarPapelDto,
@@ -32,8 +34,15 @@ export class AtivoDetalhesService {
     });
   }
 
-  adicionarPapel(ativoId: string, dto: CriarPapelDto, usuarioId: string) {
+  /** Só o Owner do ativo (ou Admin) gerencia papéis. */
+  adicionarPapel(
+    ativoId: string,
+    dto: CriarPapelDto,
+    usuario: UsuarioAutenticado,
+  ) {
+    const usuarioId = usuario.id;
     return this.prisma.$transaction(async (tx) => {
+      await exigirPapelNoAtivo(tx, ativoId, usuario, ['Owner']);
       const novo = await tx.papel_ativo.create({
         data: { ativo_id: ativoId, ...dto },
         include: { pessoa: PESSOA_RESUMO },
@@ -47,8 +56,15 @@ export class AtivoDetalhesService {
     });
   }
 
-  removerPapel(ativoId: string, papelId: string, usuarioId: string) {
+  /** Remover o único Owner é permitido: o ativo passa a constar como pendência. */
+  removerPapel(
+    ativoId: string,
+    papelId: string,
+    usuario: UsuarioAutenticado,
+  ) {
+    const usuarioId = usuario.id;
     return this.prisma.$transaction(async (tx) => {
+      await exigirPapelNoAtivo(tx, ativoId, usuario, ['Owner']);
       // where com ativo_id garante que o papel pertence ao ativo da URL.
       const antigo = await tx.papel_ativo.delete({
         where: { id: papelId, ativo_id: ativoId },
@@ -73,10 +89,15 @@ export class AtivoDetalhesService {
   salvarContextualizacao(
     ativoId: string,
     dto: SalvarContextualizacaoDto,
-    usuarioId: string,
+    usuario: UsuarioAutenticado,
   ) {
+    const usuarioId = usuario.id;
     const respostas = dto.respostas as Prisma.InputJsonObject;
     return this.prisma.$transaction(async (tx) => {
+      await exigirPapelNoAtivo(tx, ativoId, usuario, [
+        'Owner',
+        'Responsavel_Tecnico',
+      ]);
       const antigo = await tx.contextualizacao_avaliacao.findUnique({
         where: { ativo_id: ativoId },
       });
@@ -142,10 +163,67 @@ export class AtivoDetalhesService {
     });
   }
 
-  registrarDecisao(ativoId: string, dto: CriarDecisaoDto, usuarioId: string) {
-    return this.prisma.decisao.create({
-      data: { ativo_id: ativoId, responsavel_id: usuarioId, ...dto },
-      include: { pessoa: PESSOA_RESUMO },
+  /**
+   * Só o Owner do ativo (ou Admin) decide; a decisão é sempre ato humano.
+   * Aprovar ou aceitar risco de um ativo em Rascunho o torna Inventariado,
+   * desde que o questionário já tenha sido preenchido (etapa 3 do pipeline).
+   */
+  registrarDecisao(
+    ativoId: string,
+    dto: CriarDecisaoDto,
+    usuario: UsuarioAutenticado,
+  ) {
+    const usuarioId = usuario.id;
+    return this.prisma.$transaction(async (tx) => {
+      await exigirPapelNoAtivo(tx, ativoId, usuario, ['Owner']);
+      const ativo = await tx.ativo.findUniqueOrThrow({
+        where: { id: ativoId },
+      });
+      if (ativo.situacao === 'Descontinuado') {
+        throw new ConflictException(
+          'Ativo descontinuado não recebe novas decisões',
+        );
+      }
+
+      const inventaria =
+        ativo.situacao === 'Rascunho' &&
+        (dto.resultado_decisao === 'Aprovado' ||
+          dto.resultado_decisao === 'Risco_Aceito');
+      if (inventaria) {
+        const respondeu = await tx.contextualizacao_avaliacao.count({
+          where: { ativo_id: ativoId },
+        });
+        if (!respondeu) {
+          throw new ConflictException(
+            'Preencha o questionário de avaliação antes de aprovar o ativo',
+          );
+        }
+      }
+
+      const decisao = await tx.decisao.create({
+        data: { ativo_id: ativoId, responsavel_id: usuarioId, ...dto },
+        include: { pessoa: PESSOA_RESUMO },
+      });
+      await this.auditoria.registrar(tx, {
+        usuarioId,
+        tabela: 'decisao',
+        novo: decisao,
+      });
+
+      if (inventaria) {
+        const inventariado = await tx.ativo.update({
+          where: { id: ativoId },
+          data: { situacao: 'Inventariado' },
+        });
+        await this.auditoria.registrar(tx, {
+          usuarioId,
+          tabela: 'ativo',
+          antigo: ativo,
+          novo: inventariado,
+          motivo: `Decisão ${decisao.id}: ${dto.resultado_decisao}`,
+        });
+      }
+      return decisao;
     });
   }
 
