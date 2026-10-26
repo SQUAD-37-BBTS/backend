@@ -9,6 +9,18 @@ import { hashSenha } from '../auth/senha.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+// Dados de exemplo com senha única e um Admin conhecido: nunca em produção
+// por descuido. Para forçar, defina SEED_PERMITIR_PRODUCAO=true.
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.SEED_PERMITIR_PRODUCAO !== 'true'
+) {
+  console.error(
+    'Seed bloqueado em produção. Defina SEED_PERMITIR_PRODUCAO=true se for intencional.',
+  );
+  process.exit(1);
+}
+
 const prisma = new PrismaService();
 
 const senhaInformada = process.env.SEED_SENHA;
@@ -73,10 +85,18 @@ interface ModeloSeed {
   proxima_revisao?: string;
 }
 
+// Datas relativas a hoje, para o exemplo não "envelhecer" a cada reexecução.
+const emMeses = (meses: number) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + meses);
+  return d.toISOString().slice(0, 10);
+};
+
 const MODELOS: ModeloSeed[] = [
-  { fornecedor: 'Anthropic', modelo: 'Claude', versao_variante: 'Sonnet', situacao: 'Homologado', inicio_vigencia: '2026-01-15', proxima_revisao: '2026-07-15' },
-  { fornecedor: 'OpenAI', modelo: 'GPT-4o', versao_variante: null, situacao: 'Restrito', restricoes_uso: 'Proibido para dados pessoais sensíveis e dados de clientes.', inicio_vigencia: '2025-09-01', proxima_revisao: '2026-03-01' },
-  { fornecedor: 'Google', modelo: 'Gemini', versao_variante: 'Pro', situacao: 'Em_Avaliacao', proxima_revisao: '2026-12-01' },
+  { fornecedor: 'Anthropic', modelo: 'Claude', versao_variante: 'Sonnet', situacao: 'Homologado', inicio_vigencia: emMeses(-5), proxima_revisao: emMeses(4) },
+  // Revisão vencida de propósito: exemplo de modelo que precisa ser reavaliado.
+  { fornecedor: 'OpenAI', modelo: 'GPT-4o', versao_variante: null, situacao: 'Restrito', restricoes_uso: 'Proibido para dados pessoais sensíveis e dados de clientes.', inicio_vigencia: emMeses(-14), proxima_revisao: emMeses(-2) },
+  { fornecedor: 'Google', modelo: 'Gemini', versao_variante: 'Pro', situacao: 'Em_Avaliacao', proxima_revisao: emMeses(2) },
   { fornecedor: 'Meta', modelo: 'Llama 2', versao_variante: '70B', situacao: 'Descontinuado', restricoes_uso: 'Substituído por versões mais recentes.', inicio_vigencia: '2024-06-01' },
 ];
 
@@ -132,7 +152,7 @@ interface AtivoSeed {
 const ATIVOS: AtivoSeed[] = [
   {
     nome: 'Assistente Virtual de Atendimento',
-    tipo_componente: 'Chatbot',
+    tipo_componente: 'Agente',
     descricao: 'Chatbot generativo que responde dúvidas de clientes no app e no site.',
     objetivo: 'Reduzir o tempo médio de atendimento e o volume de chamados no primeiro nível.',
     dominio: 'Atendimento ao Cliente',
@@ -141,6 +161,8 @@ const ATIVOS: AtivoSeed[] = [
     usa_cloud: true,
     papeis: [['bruno', 'Owner'], ['ana', 'Steward'], ['diego', 'Responsavel_Tecnico']],
     respostas: {
+      usa_ia: true,
+      usa_modelo_fundacional: true,
       usa_dados_pessoais: true,
       interage_com_cliente_final: true,
       decisao_automatizada: false,
@@ -148,16 +170,16 @@ const ATIVOS: AtivoSeed[] = [
       supervisao_humana: true,
     },
     enquadramento: {
-      trilha_governanca: 'Reforcada',
+      trilha_governanca: 'Assistida',
       explicacao_enquadramento: 'Interage diretamente com clientes e trata dados pessoais.',
     },
     decisoes: [
-      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'ana', justificativa: 'Controles de privacidade e supervisão humana validados.', resultado_decisao: 'Aprovado' },
+      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'bruno', justificativa: 'Controles de privacidade e supervisão humana validados.', resultado_decisao: 'Aprovado' },
     ],
   },
   {
     nome: 'Motor de Score de Crédito',
-    tipo_componente: 'Modelo Preditivo',
+    tipo_componente: 'Modelo de ML',
     descricao: 'Modelo de machine learning que estima a probabilidade de inadimplência.',
     objetivo: 'Apoiar a concessão de crédito com decisões consistentes e rastreáveis.',
     dominio: 'Crédito e Risco',
@@ -166,6 +188,8 @@ const ATIVOS: AtivoSeed[] = [
     usa_cloud: false,
     papeis: [['carla', 'Owner'], ['ana', 'Steward'], ['diego', 'Responsavel_Tecnico'], ['bruno', 'Consumidor']],
     respostas: {
+      usa_ia: true,
+      usa_modelo_fundacional: false,
       usa_dados_pessoais: true,
       interage_com_cliente_final: false,
       decisao_automatizada: true,
@@ -173,17 +197,17 @@ const ATIVOS: AtivoSeed[] = [
       supervisao_humana: true,
     },
     enquadramento: {
-      trilha_governanca: 'Reforcada',
+      trilha_governanca: 'Orquestrada',
       explicacao_enquadramento: 'Decisão automatizada com impacto financeiro direto sobre o cliente.',
     },
     decisoes: [
-      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'ana', justificativa: 'Documentação de viés e explicabilidade completa.', resultado_decisao: 'Adequacao_Solicitada' },
-      { tipo_decisao: 'Reavaliacao', responsavel: 'ana', justificativa: 'Ajustes de monitoramento de drift implementados.', resultado_decisao: 'Aprovado' },
+      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'carla', justificativa: 'Documentação de viés e explicabilidade completa.', resultado_decisao: 'Adequacao_Solicitada' },
+      { tipo_decisao: 'Reavaliacao', responsavel: 'carla', justificativa: 'Ajustes de monitoramento de drift implementados.', resultado_decisao: 'Aprovado' },
     ],
   },
   {
     nome: 'Busca Semântica de Documentos Internos',
-    tipo_componente: 'RAG',
+    tipo_componente: 'LLM / API',
     descricao: 'Busca com embeddings sobre políticas e manuais internos.',
     objetivo: 'Facilitar o acesso a normativos pelos colaboradores.',
     dominio: 'Dados e Analytics',
@@ -192,22 +216,24 @@ const ATIVOS: AtivoSeed[] = [
     usa_cloud: true,
     papeis: [['diego', 'Owner'], ['ana', 'Steward'], ['bruno', 'Consumidor'], ['carla', 'Consumidor']],
     respostas: {
+      usa_ia: true,
+      usa_modelo_fundacional: true,
       usa_dados_pessoais: false,
       interage_com_cliente_final: false,
       decisao_automatizada: false,
       modelo_fundacional: 'Google Gemini Pro',
     },
     enquadramento: {
-      trilha_governanca: 'Padrao',
+      trilha_governanca: 'Simplificada',
       explicacao_enquadramento: 'Uso interno, sem dados pessoais e sem decisão automatizada.',
     },
     decisoes: [
-      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'ana', justificativa: 'Risco aceito enquanto o modelo está em avaliação, com revisão em 90 dias.', resultado_decisao: 'Risco_Aceito' },
+      { tipo_decisao: 'Aprovacao_Inicial', responsavel: 'diego', justificativa: 'Risco aceito enquanto o modelo está em avaliação, com revisão em 90 dias.', resultado_decisao: 'Risco_Aceito' },
     ],
   },
   {
     nome: 'Classificador de Reclamações',
-    tipo_componente: 'Modelo de Classificação',
+    tipo_componente: 'Modelo de ML',
     descricao: 'Classifica reclamações por tema e urgência.',
     objetivo: 'Priorizar o tratamento de reclamações críticas.',
     dominio: 'Atendimento ao Cliente',
@@ -215,9 +241,20 @@ const ATIVOS: AtivoSeed[] = [
     usa_cloud: true,
     papeis: [['bruno', 'Owner']],
   },
+  // Sem Owner de propósito: exemplo da pendência "sem_owner" (não bloqueia o cadastro).
+  {
+    nome: 'Painel de Indicadores de Fraude',
+    tipo_componente: 'Painel / Dashboard',
+    descricao: 'Painel com alertas de transações suspeitas para a área de risco.',
+    objetivo: 'Dar visibilidade a padrões de fraude para o time de análise.',
+    dominio: 'Crédito e Risco',
+    situacao: 'Rascunho',
+    usa_cloud: true,
+    papeis: [['diego', 'Responsavel_Tecnico']],
+  },
   {
     nome: 'Previsão de Demanda (legado)',
-    tipo_componente: 'Modelo Preditivo',
+    tipo_componente: 'Modelo de ML',
     descricao: 'Modelo de séries temporais substituído pela plataforma atual de analytics.',
     objetivo: 'Prever volume de operações para dimensionamento de equipe.',
     dominio: 'Dados e Analytics',
@@ -261,19 +298,25 @@ for (const a of ATIVOS) {
         motor_enquadramento: { create: a.enquadramento },
       }),
     },
+    include: { papel_ativo: true },
   });
 
   // Decisões são append-only (o banco bloqueia UPDATE/DELETE).
-  if (a.decisoes?.length) {
-    await prisma.decisao.createMany({
-      data: a.decisoes.map(({ responsavel, ...d }) => ({
-        ...d,
-        ativo_id: ativo.id,
-        responsavel_id: pessoa[responsavel],
-      })),
+  for (const { responsavel, ...d } of a.decisoes ?? []) {
+    const decisao = await prisma.decisao.create({
+      data: { ...d, ativo_id: ativo.id, responsavel_id: pessoa[responsavel] },
+    });
+    await prisma.log_auditoria.create({
+      data: {
+        usuario_id: pessoa[responsavel],
+        tabela_afetada: 'decisao',
+        valor_novo: JSON.parse(JSON.stringify(decisao)) as Prisma.InputJsonObject,
+        motivo: MOTIVO,
+      },
     });
   }
 
+  // Auditoria no mesmo formato do fluxo real: ativo e cada papel atribuído.
   await prisma.log_auditoria.create({
     data: {
       usuario_id: pessoa.ana,
@@ -282,6 +325,16 @@ for (const a of ATIVOS) {
       motivo: MOTIVO,
     },
   });
+  for (const papel of ativo.papel_ativo) {
+    await prisma.log_auditoria.create({
+      data: {
+        usuario_id: pessoa.ana,
+        tabela_afetada: 'papel_ativo',
+        valor_novo: JSON.parse(JSON.stringify(papel)) as Prisma.InputJsonObject,
+        motivo: MOTIVO,
+      },
+    });
+  }
 }
 
 console.log(

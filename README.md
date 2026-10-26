@@ -31,6 +31,7 @@ SEED_SENHA="..." npm run db:seed   # dados de exemplo (senha mín. 8; sem ela, �
 - A migration `prisma/migrations/20261026000000_init` é um baseline **idempotente**: num banco vazio cria tudo (tabelas, checks, índices e triggers); num banco que já tem o modelo não altera nada. Em um banco existente sem `_prisma_migrations`, marque-a como aplicada uma vez: `npx prisma migrate resolve --applied 20261026000000_init`.
 - Os triggers mantêm `updated_at` (a API não o preenche) e tornam `decisao` append-only.
 - O seed é **apenas aditivo e idempotente**: não altera nem remove registros existentes e pode ser reexecutado. Cria pessoas (`*@orion.local`, uma Admin), domínios, catálogo, ativos com papéis, contextualização, enquadramento, decisões e auditoria.
+- O seed se recusa a rodar com `NODE_ENV=production` (cria um Admin com senha conhecida); para forçar, defina `SEED_PERMITIR_PRODUCAO=true`.
 - `src/generated/` (client do Prisma) é gerado por `npx prisma generate`.
 
 Testes e lint: `npm run test`, `npm run test:e2e`, `npm run lint`.
