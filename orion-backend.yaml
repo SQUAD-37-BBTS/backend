@@ -1,0 +1,60 @@
+version: "3.7"
+
+services:
+
+  # ---------- Backend Orion (NestJS) ----------
+  orion_backend:
+    image: ghcr.io/squad-37-bbts/backend:latest
+    command: ["node", "dist/main"]
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TRUST_PROXY=1
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
+      - DB_POOL_MAX=${DB_POOL_MAX}
+      - DB_CONNECTION_TIMEOUT_MS=${DB_CONNECTION_TIMEOUT_MS}
+      - DB_QUERY_TIMEOUT_MS=${DB_QUERY_TIMEOUT_MS}
+      - HTTP_TIMEOUT_MS=${HTTP_TIMEOUT_MS}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_TTL_SEGUNDOS=${JWT_ACCESS_TTL_SEGUNDOS}
+      - JWT_REFRESH_TTL_DIAS=${JWT_REFRESH_TTL_DIAS}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX}
+      - RATE_LIMIT_LOGIN_MAX=${RATE_LIMIT_LOGIN_MAX}
+      - RATE_LIMIT_LOGIN_BLOQUEIO_MIN=${RATE_LIMIT_LOGIN_BLOQUEIO_MIN}
+      - RATE_LIMIT_REFRESH_MAX=${RATE_LIMIT_REFRESH_MAX}
+    networks:
+      - network_public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+      update_config:
+        order: start-first
+        failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        - "traefik.http.routers.orion_backend.rule=Host(`api.treifit.com.br`)"
+        - "traefik.http.routers.orion_backend.entrypoints=websecure"
+        - "traefik.http.routers.orion_backend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.orion_backend.service=orion_backend"
+        - "traefik.http.services.orion_backend.loadbalancer.server.port=3000"
+
+networks:
+  network_public:
+    external: true
+    name: network_public
