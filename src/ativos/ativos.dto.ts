@@ -134,3 +134,13 @@ export class CriarDecisaoDto {
   @IsIn(RESULTADO_DECISAO)
   resultado_decisao: string;
 }
+
+export class ResponderRecomendacaoDto {
+  @IsIn(['Aceitar', 'Rejeitar'])
+  acao: 'Aceitar' | 'Rejeitar';
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  justificativa: string;
+}

@@ -23,10 +23,13 @@ import {
   CriarAtivoDto,
   CriarDecisaoDto,
   CriarPapelDto,
+  ResponderRecomendacaoDto,
   SalvarContextualizacaoDto,
   SalvarEnquadramentoDto,
 } from './ativos.dto.js';
 import { AtivosService } from './ativos.service.js';
+import { RecomendacaoService } from './recomendacao.service.js';
+import { SugestaoIaService } from './sugestao-ia.service.js';
 
 const Id = () => Param('id', ParseUUIDPipe);
 
@@ -35,6 +38,8 @@ export class AtivosController {
   constructor(
     private readonly ativos: AtivosService,
     private readonly detalhes: AtivoDetalhesService,
+    private readonly recomendacao: RecomendacaoService,
+    private readonly sugestaoIa: SugestaoIaService,
   ) {}
 
   // ---------- Ativo
@@ -143,5 +148,28 @@ export class AtivosController {
     @UsuarioAtual() u: UsuarioAutenticado,
   ) {
     return this.detalhes.registrarDecisao(id, dto, u);
+  }
+
+  // ---------- IA (sugestão e recomendação; a decisão é sempre humana)
+
+  /** Sugestões para o questionário; nada é gravado até o usuário salvar. */
+  @Post(':id/sugestao-ia')
+  @HttpCode(200)
+  sugerir(@Id() id: string, @UsuarioAtual() u: UsuarioAutenticado) {
+    return this.sugestaoIa.sugerir(id, u);
+  }
+
+  @Get(':id/recomendacao')
+  buscarRecomendacao(@Id() id: string) {
+    return this.recomendacao.buscar(id);
+  }
+
+  @Post(':id/recomendacao')
+  responderRecomendacao(
+    @Id() id: string,
+    @Body() dto: ResponderRecomendacaoDto,
+    @UsuarioAtual() u: UsuarioAutenticado,
+  ) {
+    return this.recomendacao.responder(id, dto, u);
   }
 }

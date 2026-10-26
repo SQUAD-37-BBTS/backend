@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { AuditoriaService } from '../auditoria/auditoria.service.js';
 import type { UsuarioAutenticado } from '../auth/decorators.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -14,6 +18,23 @@ import type {
 const PESSOA_RESUMO = {
   select: { id: true, nome: true, email: true },
 } as const;
+
+const ORIGENS_VALIDAS = ['usuario', 'ia'];
+
+/** `origens` registra se cada resposta veio do usuário ou de sugestão de IA. */
+function validarOrigens(origens: unknown) {
+  if (origens === undefined) return;
+  const valido =
+    typeof origens === 'object' &&
+    origens !== null &&
+    !Array.isArray(origens) &&
+    Object.values(origens).every((o) => ORIGENS_VALIDAS.includes(o as string));
+  if (!valido) {
+    throw new BadRequestException(
+      "origens deve mapear cada resposta para 'usuario' ou 'ia'",
+    );
+  }
+}
 
 /** Sub-recursos de um ativo: papéis, avaliação, enquadramento e decisões. */
 @Injectable()
@@ -92,6 +113,7 @@ export class AtivoDetalhesService {
     usuario: UsuarioAutenticado,
   ) {
     const usuarioId = usuario.id;
+    validarOrigens(dto.respostas.origens);
     const respostas = dto.respostas as Prisma.InputJsonObject;
     return this.prisma.$transaction(async (tx) => {
       await exigirPapelNoAtivo(tx, ativoId, usuario, [

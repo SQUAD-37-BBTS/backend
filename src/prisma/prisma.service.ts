@@ -32,7 +32,13 @@ export class PrismaService
     super({
       adapter,
       omit: OMIT_PADRAO,
-      transactionOptions: { maxWait: 2_000, timeout: 5_000 },
+      // maxWait = tempo para obter conexão do pool; não deve ser menor que
+      // connectionTimeoutMillis, senão a transação falha antes do pool responder
+      // (P2028 "Unable to start a transaction in the given time").
+      transactionOptions: {
+        maxWait: Number(process.env.DB_TX_MAX_WAIT_MS ?? 10_000),
+        timeout: Number(process.env.DB_TX_TIMEOUT_MS ?? 15_000),
+      },
     });
   }
 
